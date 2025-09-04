@@ -6,6 +6,7 @@
 #include<DxLib.h>
 #include "../General/game.h"
 #include "../General/Collision/Physics.h"
+#include "../General/Effect/EffekseerManager.h"
 #include "../General/Fader.h"
 #include "../Game/UI/UIManager.h"
 #include "../Game/UI/MenuUI.h"
@@ -16,7 +17,8 @@ namespace {
 	//各メニューの位置
 	constexpr float kGameoverY = 100;
 	constexpr float kContinueY = 300;
-	constexpr float kSelectStageY = 500;
+	constexpr float kRestartY = 420;
+	constexpr float kSelectStageY = 540;
 }
 
 GameoverScene::GameoverScene(SceneController& controller, Stage::StageIndex index):
@@ -37,6 +39,8 @@ void GameoverScene::Init()
 {
 	//Physicsを止める
 	Physics::GetInstance().StopUpdate();
+	//エフェクト停止
+	EffekseerManager::GetInstance().StopEffect();
 }
 
 void GameoverScene::Update()
@@ -52,6 +56,8 @@ void GameoverScene::End()
 {
 	//Physicsを開始
 	Physics::GetInstance().StartUpdate();
+	//エフェクト開始
+	EffekseerManager::GetInstance().StartEffect();
 }
 
 void GameoverScene::Restart()
@@ -82,6 +88,13 @@ void GameoverScene::NormalUpdate()
 			menuUI.second.lock()->Delete();
 		}
 		m_gameoverUI.lock()->Delete();
+		//続きからの場合
+		if(m_menuSelectIndex == MenuIndex::Continue)
+		{
+			//続きから
+			Continue();
+			return;
+		}
 		//だんだん暗く
 		auto& fader = Fader::GetInstance();
 		fader.FadeOut();
@@ -100,9 +113,9 @@ void GameoverScene::DisappearUpdate()
 	{
 		switch (m_menuSelectIndex)
 		{
-		case MenuIndex::Continue:
+		case MenuIndex::Restart:
 			//最初から
-			Continue();
+			RestartBase();
 			break;
 		case MenuIndex::SelectStage:
 			//ステージセレクト
@@ -133,8 +146,10 @@ void GameoverScene::InitUI()
 	gameoverUI->Init();
 	m_gameoverUI = gameoverUI;
 	auto continueUI = std::make_shared<MenuUI>(Vector2{ Game::kScreenCenterX,kContinueY }, uiManager.GetImageHandle("Continue"));
+	auto restartGameUI = std::make_shared<MenuUI>(Vector2{ Game::kScreenCenterX,kRestartY }, uiManager.GetImageHandle("RestartGame"));
 	auto selectStageUI = std::make_shared<MenuUI>(Vector2{ Game::kScreenCenterX,kSelectStageY }, uiManager.GetImageHandle("SelectStage"));
 	m_menuUIs[MenuIndex::Continue] = continueUI;
+	m_menuUIs[MenuIndex::Restart] = restartGameUI;
 	m_menuUIs[MenuIndex::SelectStage] = selectStageUI;
 	//登録
 	for (auto& menuUI : m_menuUIs)
@@ -161,11 +176,24 @@ void GameoverScene::MenuSelect(Input& input)
 
 void GameoverScene::Continue()
 {
+	//自分の下になってるシーンを取得
+	auto baseScene = m_controller.GetBaseScene();
+	if (baseScene.expired())return;
+	auto stageScene = std::dynamic_pointer_cast<StageScene>(baseScene.lock());
+	//プレイヤーを復活
+	stageScene->Continue();
+	m_controller.PopScene();//自分は消える
+	return;
+}
+
+void GameoverScene::RestartBase()
+{
 	//自分の下になってるシーンを初期化
 	m_controller.RestartBaseScene();
 	m_controller.PopScene();//自分は消える
 	return;
 }
+
 void GameoverScene::SelectStage()
 {
 	//セレクトシーンへ

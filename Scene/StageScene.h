@@ -23,10 +23,13 @@ public:
     virtual void Draw() override;
     virtual void End() override;
     virtual void Restart() override;
+    void Continue();
 private:
     //ゲームマネージャー
     std::unique_ptr<GameManager> m_gameManager;
     //ステージ番号
     Stage::StageIndex m_stageIndex;
+	//BGM初期化
+    void InitBGM();
 };
 
